@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+[ -z "$1" ] && exit 1
+
+cproc -emit-qbe "$1" -o test.qbe 2>/dev/null
+qbe -dL test.qbe 2>&1 | jq

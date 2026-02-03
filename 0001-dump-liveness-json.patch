@@ -1,0 +1,122 @@
+From 39a08cebc1b99a414c3053d49cb4d6edaffeaaab Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ludvig=20Gunne=20Lindstr=C3=B6m?=
+ <ludviggunnelindstrom@gmail.com>
+Date: Tue, 3 Feb 2026 14:58:15 +0100
+Subject: [PATCH] dump liveness json
+
+---
+ live.c  | 19 +++++++++++++------
+ main.c  |  3 ++-
+ parse.c |  7 +++++++
+ util.c  |  7 +++++--
+ 4 files changed, 27 insertions(+), 9 deletions(-)
+
+diff --git a/live.c b/live.c
+index 68f48b0..1071533 100644
+--- a/live.c
++++ b/live.c
+@@ -129,16 +129,23 @@ Again:
+ 	}
+ 
+ 	if (debug['L']) {
+-		fprintf(stderr, "\n> Liveness analysis:\n");
++		// fprintf(stderr, "{\n");
++		int first = 1;
+ 		for (b=f->start; b; b=b->link) {
+-			fprintf(stderr, "\t%-10sin:   ", b->name);
++			if (first) {
++				fprintf(stderr, "    \"%s\": {\n", b->name);
++			} else {
++				fprintf(stderr, "    ,\"%s\": {\n", b->name);
++			}
++			fprintf(stderr, "      \"in\": ");
+ 			dumpts(b->in, f->tmp, stderr);
+-			fprintf(stderr, "\t          out:  ");
++			fprintf(stderr, "      ,\"out\": ");
+ 			dumpts(b->out, f->tmp, stderr);
+-			fprintf(stderr, "\t          gen:  ");
++			fprintf(stderr, "      ,\"gen\": ");
+ 			dumpts(b->gen, f->tmp, stderr);
+-			fprintf(stderr, "\t          live: ");
+-			fprintf(stderr, "%d %d\n", b->nlive[0], b->nlive[1]);
++			fprintf(stderr, "    }\n");
++			first = 0;
+ 		}
++		// fprintf(stderr, "}\n");
+ 	}
+ }
+diff --git a/main.c b/main.c
+index 61065dd..31b5cca 100644
+--- a/main.c
++++ b/main.c
+@@ -54,7 +54,7 @@ func(Fn *fn)
+ 	uint n;
+ 
+ 	if (dbg)
+-		fprintf(stderr, "**** Function %s ****", fn->name);
++		// fprintf(stderr, "**** Function %s ****", fn->name);
+ 	if (debug['P']) {
+ 		fprintf(stderr, "\n> After parsing:\n");
+ 		printfn(fn, stderr);
+@@ -205,6 +205,7 @@ main(int ac, char *av[])
+ 
+ 	if (!dbg)
+ 		T.emitfin(outf);
++	fprintf(stderr, "}\n");
+ 
+ 	exit(0);
+ }
+diff --git a/parse.c b/parse.c
+index 7ab3ea5..4580959 100644
+--- a/parse.c
++++ b/parse.c
+@@ -926,6 +926,7 @@ parsefn(Lnk *lnk)
+ 	if (next() != Tglo)
+ 		err("function name expected");
+ 	strncpy(curf->name, tokval.str, NString-1);
++	fprintf(stderr, "  \"%s\": {\n", curf->name);
+ 	curf->vararg = parserefl(0);
+ 	if (nextnl() != Tlbrace)
+ 		err("function body must start with {");
+@@ -1216,6 +1217,8 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn
+ 	thead = Txxx;
+ 	ntyp = 0;
+ 	typ = vnew(0, sizeof typ[0], PHeap);
++	int first = 1;
++	fprintf(stderr, "{\n");
+ 	for (;;) {
+ 		lnk = (Lnk){0};
+ 		switch (parselnk(&lnk)) {
+@@ -1227,7 +1230,11 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn
+ 			break;
+ 		case Tfunc:
+ 			lnk.align = 16;
++			if (!first)
++				fprintf(stderr, ",");
++			first = 0;
+ 			func(parsefn(&lnk));
++			fprintf(stderr, "  }\n");
+ 			break;
+ 		case Tdata:
+ 			parsedat(data, &lnk);
+diff --git a/util.c b/util.c
+index c891c4e..ffa8c0a 100644
+--- a/util.c
++++ b/util.c
+@@ -714,8 +714,11 @@ dumpts(BSet *bs, Tmp *tmp, FILE *f)
+ 	int t;
+ 
+ 	fprintf(f, "[");
+-	for (t=Tmp0; bsiter(bs, &t); t++)
+-		fprintf(f, " %s", tmp[t].name);
++	int first = 1;
++	for (t=Tmp0; bsiter(bs, &t); t++) {
++		fprintf(f, "%s \"%s\"", first ? "" : ", ", tmp[t].name);
++		first = 0;
++	}
+ 	fprintf(f, " ]\n");
+ }
+ 
+-- 
+2.44.2
+
